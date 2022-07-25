@@ -1,3 +1,5 @@
+use std::net::TcpStream;
+
 fn main() {
     //    字符串
     {
@@ -96,6 +98,54 @@ fn main() {
         // 之前的 User 结构体的定义中，有一处细节：我们使用了自身拥有所有权的 String 类型而不是基于引用的 &str 字符串切片类型。这是一个有意而为之的选择：因为想要这个结构体拥有它所有的数据，而不是从其它地方借用数据。
         // 也可以让 User 结构体从其它对象借用数据，不过这么做，就需要引入生命周期(lifetimes)这个新概念（也是一个复杂的概念），简而言之，生命周期能确保结构体的作用范围要比它所借用的数据的作用范围要小
     }
+    // 枚举
+    // 枚举类型是一个类型，它会包含所有可能的枚举成员, 而枚举值是该类型中的具体某个成员的实例
+    {
+        let heart = PokerSuit::Hearts;
+        let diamond = PokerSuit::Diamonds;
+        print_suit(heart);
+        let card1 = PokerCard::Clubs(String::from("A"));
+        let card2 = PokerCard::Spades(String::from("10"));
+    }
+    // Option 枚举用于处理空值
+    // 在其它编程语言中，往往都有一个 null 关键字，该关键字用于表明一个变量当前的值为空（不是零值，例如整型的零值是 0），
+    // 也就是不存在值。当你对这些 null 进行操作时，例如调用一个方法，就会直接抛出null 异常，导致程序的崩溃，因此我们在
+    // 编程时需要格外的小心去处理这些 null 空值。
+    // Rust 吸取了众多教训，决定抛弃 null，而改为使用 Option 枚举变量来表述这种结果。
+    // enum Option<T> {
+    //     Some(T),
+    //     None,
+    // }
+    // T 是泛型参数，Some(T)表示该枚举成员的数据类型是 T，换句话说，Some 可以包含任何类型的数据。
+    {
+        let some_num = Some(100);
+        let some_string = Some("dont give up");
+        // 使用 None 而不是 Some，需要告诉 Rust Option<T> 是什么类型的，因为编译器只通过 None 值无法推断出 Some 成员保存的值的类型。
+        // 当有一个 Some 值时，我们就知道存在一个值，而这个值保存在 Some 中。当有个 None 值时，在某种意义上，它跟空值具有相同的意义：并没有一个有效的值
+        let absent_num: Option<i32> = None;
+
+        let x: i8 = 5;
+        let y: Option<i8> = Some(5);
+        // cannot add `Option<i8>` to `i8`
+        // the trait `Add<Option<i8>>` is not implemented for `i8`
+        // the following other types implement trait `Add<Rhs>`
+        // 错误信息意味着 Rust 不知道该如何将 Option<i8> 与 i8 相加，因为它们的类型不同。
+        // 当在 Rust 中拥有一个像 i8 这样类型的值时，编译器确保它总是有一个有效的值，
+        // 我们可以放心使用而无需做空值检查。只有当使用 Option<i8>（或者任何用到的类型）的时候才需要担心可能没有值，
+        // 而编译器会确保我们在使用值之前处理了为空的情况。
+        // 不再担心会错误的使用一个空值，会让你对代码更加有信心。为了拥有一个可能为空的值，你必须要显式的将其放入对应类型的 Option<T> 中。
+        // 接着，当使用这个值时，必须明确的处理值为空的情况。只要一个值不是 Option<T> 类型，你就 可以 安全的认定它的值不为空。
+        // 这是 Rust 的一个经过深思熟虑的设计决策，来限制空值的泛滥以增加 Rust 代码的安全性。
+        // 总的来说，为了使用 Option<T> 值，需要编写处理每个成员的代码。你想要一些代码只当拥有 Some(T) 值时运行，允许这些代码使用其中的 T。
+        // 也希望一些代码在值为 None 时运行，这些代码并没有一个可用的 T 值。match 表达式就是这么一个处理枚举的控制流结构：
+        // 它会根据枚举的成员运行不同的代码，这些代码可以使用匹配到的值中的数据。
+        // let sum = x + y;
+        let five = Some(5);
+        let six = plus_one(five);
+        let none = plus_one(None);
+        println!("{:?}", six);
+        println!("{:?}", none)
+    }
 }
 
 fn greet(name: String) {
@@ -142,5 +192,61 @@ fn build_user_in_a_dum_way(
         username: username,
         sign_in_count: sign_in_count,
         email: email,
+    }
+}
+// Rust 默认不会为我们实现 Debug，为了实现，有两种方式可以选择：
+// 手动实现
+// 使用 derive 派生实现
+// 后者简单的多，但是也有限制
+// 还有一个简单的输出 debug 信息的方法，那就是使用 dbg! 宏，它会拿走表达式的所有权，
+// 然后打印出相应的文件名、行号等 debug 信息，当然还有我们需要的表达式的求值结果。除此之外，它最终还会把表达式值的所有权返回！
+// dbg! 输出到标准错误输出 stderr，而 println! 输出到标准输出 stdout
+#[derive(Debug)]
+enum PokerSuit {
+    Clubs,
+    Spades,
+    Diamonds,
+    Hearts,
+}
+
+struct PorkerCard {
+    suit: PokerSuit,
+    value: u8,
+}
+
+// 更好的方式
+enum PokerCard {
+    Clubs(String),
+    Spades(String),
+    Diamonds(String),
+    Hearts(String),
+}
+
+fn print_suit(card: PokerSuit) {
+    println!("{:?}", card);
+}
+
+// 由于每个结构体都有自己的类型，因此我们无法在需要同一类型的地方进行使用，例如某个函数它的功能是接受消息并进行发送，那么用枚举的方式，
+// 就可以接收不同的消息，但是用结构体，该函数无法接受 4 个不同的结构体作为参数。
+// 而且从代码规范角度来看，枚举的实现更简洁，代码内聚性更强，不像结构体的实现，分散在各个地方。
+enum Message {
+    Quit,
+    Move { x: i32, y: i32 },
+    Write(String),
+    ChangeColor(i32, i32, i32),
+}
+// 👆🏻枚举也可以用一下方式呈现
+struct QuitMessage; // 单元结构体
+struct MoveMessage {
+    x: i32,
+    y: i32,
+}
+struct WriteMessage(String); // 元组结构体
+struct ChangeColorMessage(i32, i32, i32); // 元组结构体
+
+fn plus_one(x: Option<i32>) -> Option<i32> {
+    match x {
+        None => None,
+        Some(x) => Some(x + 1),
     }
 }
