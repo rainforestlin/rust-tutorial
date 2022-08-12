@@ -7,39 +7,39 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable '${cwd}'",
+            "name": "Debug executable 'method'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=${cwd}",
-                    "--package=${cwd}"
+                    "--bin=method",
+                    "--package=method"
                 ],
                 "filter": {
-                    "name": "${cwd}",
+                    "name": "method",
                     "kind": "bin"
                 }
             },
             "args": [],
-            "cwd": "${cwd}"
+            "cwd": "${workspaceFolder}"
         },
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable '${cwd}'",
+            "name": "Debug unit tests in executable 'method'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=f${cwd}",
-                    "--package=${cwd}/${file}"
+                    "--bin=method",
+                    "--package=method"
                 ],
                 "filter": {
-                    "name": "${cwd}",
+                    "name": "method",
                     "kind": "bin"
                 }
             },
             "args": [],
-            "cwd": "${cwd}"
+            "cwd": "${workspaceFolder}"
         }
     ]
 }
