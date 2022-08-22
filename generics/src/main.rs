@@ -59,11 +59,107 @@ fn main() {
         };
         println!("{}", car_shop.sale());
         println!("{}", coffee_store.sale());
-        let default = default_shop {
+        let default = DefaultShop {
             name: "default".to_string(),
         };
         println!("{}", default.sale());
         println!("{}", default.Buy())
+    }
+    {
+        // impl Trait 的返回值类型并不支持多种不同的类型返回
+        // 如果想返回多钟类型，可以使用枚举，但在对枚举中类型并不清楚的情况下，枚举并不是最佳选择。
+        // 特征对象
+        {
+            pub trait Draw {
+                fn draw(&self);
+            }
+            pub struct Button {
+                pub width: u32,
+                pub height: u32,
+                pub label: String,
+            }
+            impl Draw for Button {
+                fn draw(&self) {
+                    println!("label is {}", self.label);
+                }
+            }
+            pub struct Image {
+                pub width: u32,
+                pub height: u32,
+                pub pixel: String,
+            }
+            impl Draw for Image {
+                fn draw(&self) {
+                    println!("piexel is {}", self.pixel);
+                }
+            }
+            // 还需要一个动态数组来存储这些 UI 对象
+            // 特征对象指向实现了 Draw 特征的类型的实例，也就是指向了 Button 或者 Image 的实例，
+            // 这种映射关系是存储在一张表中，可以在运行时通过特征对象找到具体调用的类型方法。
+            // 可以通过&引用或者用Box<>智能指针
+            fn draw1(x: &dyn Draw) {
+                x.draw();
+            }
+            fn draw2(x: Box<dyn Draw>) {
+                x.draw();
+            }
+            pub struct Screen {
+                pub components: Vec<Box<dyn Draw>>,
+            }
+            impl Screen {
+                pub fn run(&self) {
+                    for component in self.components.iter() {
+                        component.draw();
+                    }
+                }
+            }
+            let mut screen = Screen {
+                components: vec![
+                    Box::new(Button {
+                        width: 10,
+                        height: 25,
+                        label: "120".to_string(),
+                    }),
+                    Box::new(Image {
+                        width: 10,
+                        height: 25,
+                        pixel: "00000010".to_string(),
+                    }),
+                ],
+            };
+            screen.run();
+
+            // 下面的 Screen1 的列表中，存储了类型为 T 的元素，然后在 Screen 中使用特征约束让 T 实现了 Draw 特征，进而可以调用 draw 方法。
+            // 但是这种写法限制了 Screen 实例的 Vec<T> 中的每个元素必须是 Button 类型或者全是 SelectBox 类型。如果只需要同质（相同类型）集合，
+            // 更倾向于这种写法：使用泛型和 特征约束，因为实现更清晰，且性能更好(特征对象，需要在运行时从 vtable 动态查找需要调用的方法)。
+            pub struct Screen1<T: Draw> {
+                pub components: Vec<T>,
+            }
+
+            impl<T> Screen1<T>
+            where
+                T: Draw,
+            {
+                pub fn run(&self) {
+                    for component in self.components.iter() {
+                        component.draw();
+                    }
+                }
+            }
+        }
+        // 特征对象的动态分发
+        // 回忆一下泛型章节我们提到过的，泛型是在编译期完成处理的：编译器会为每一个泛型参数对应的具体类型生成一份代码，这种方式是静态分发(static dispatch)，因为是在编译期完成的，对于运行期性能完全没有任何影响。
+        // 与静态分发相对应的是动态分发(dynamic dispatch)，在这种情况下，直到运行时，才能确定需要调用什么方法。之前代码中的关键字 dyn 正是在强调这一“动态”的特点。
+        // 当使用特征对象时，Rust 必须使用动态分发。编译器无法知晓所有可能用于特征对象代码的类型，所以它也不知道应该调用哪个类型的哪个方法实现。为此，Rust 在运行时
+        // 使用特征对象中的指针来知晓需要调用哪个方法。动态分发也阻止编译器有选择的内联方法代码，这会相应的禁用一些优化。
+
+        // 特征对象大小不固定：这是因为，对于特征 Draw，类型 Button 可以实现特征 Draw，类型 SelectBox 也可以实现特征 Draw，因此特征没有固定大小
+        // 几乎总是使用特征对象的引用方式，如 &dyn Draw、Box<dyn Draw>
+        // 虽然特征对象没有固定大小，但它的引用类型的大小是固定的，它由两个指针组成（ptr 和 vptr），因此占用两个指针大小
+        // 一个指针 ptr 指向实现了特征 Draw 的具体类型的实例，也就是当作特征 Draw 来用的类型的实例，比如类型 Button 的实例、类型 SelectBox 的实例
+        // 另一个指针 vptr 指向一个虚表 vtable，vtable 中保存了类型 Button 或类型 SelectBox 的实例对于可以调用的实现于特征 Draw 的方法。当调用方法时，
+        // 直接从 vtable 中找到方法并调用。之所以要使用一个 vtable 来保存各实例的方法，是因为实现了特征 Draw 的类型有多种，这些类型拥有的方法各不相同，
+        // 当将这些类型的实例都当作特征 Draw 来使用时(此时，它们全都看作是特征 Draw 类型的实例)，有必要区分这些实例各自有哪些方法可调用
     }
 }
 
@@ -100,7 +196,6 @@ struct Point<T> {
 }
 
 // 如果想让 x 和 y 即能类型相同，又能类型不同，需要使用不同的泛型参数
-
 struct PointT<T, U> {
     x: T,
     y: U,
@@ -126,7 +221,7 @@ struct CarShop {
     car_brand: String,
 }
 
-struct default_shop {
+struct DefaultShop {
     name: String,
 }
 // 特征。和golang中的interface很像
@@ -155,4 +250,4 @@ impl Goods for CarShop {
     }
 }
 
-impl Goods for default_shop {}
+impl Goods for DefaultShop {}
