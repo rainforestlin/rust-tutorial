@@ -1,14 +1,22 @@
 // 通常会有需求 用同一功能的函数处理不同类型的数据，例如两个数的加法，无论是整数还是浮点数，甚至是自定义类型，
 // 都能进行支持。在不支持泛型的编程语言中，通常需要为每一种类型编写一个函数
 
+extern crate core;
+
+
 use core::str;
+use std::fmt;
+use std::hash::Hash;
+use std::ops::Add;
 
 fn add_i8(a: i8, b: i8) -> i8 {
     a + b
 }
+
 fn add_i32(a: i32, b: i32) -> i32 {
     a + b
 }
+
 fn add_f64(a: f64, b: f64) -> f64 {
     a + b
 }
@@ -137,8 +145,8 @@ fn main() {
             }
 
             impl<T> Screen1<T>
-            where
-                T: Draw,
+                where
+                    T: Draw,
             {
                 pub fn run(&self) {
                     for component in self.components.iter() {
@@ -160,6 +168,127 @@ fn main() {
         // 另一个指针 vptr 指向一个虚表 vtable，vtable 中保存了类型 Button 或类型 SelectBox 的实例对于可以调用的实现于特征 Draw 的方法。当调用方法时，
         // 直接从 vtable 中找到方法并调用。之所以要使用一个 vtable 来保存各实例的方法，是因为实现了特征 Draw 的类型有多种，这些类型拥有的方法各不相同，
         // 当将这些类型的实例都当作特征 Draw 来使用时(此时，它们全都看作是特征 Draw 类型的实例)，有必要区分这些实例各自有哪些方法可调用
+    }
+    {
+        //     关联类型
+        // 以下是标准库的迭代器特征Iterator，有一个Item关联类型用于替代遍历的值的类型
+        // next方法也返回一个Item类型，不过是使用Option枚举进行了包裹
+        // Self用来替代当前调用者的具体类型(self是用来替代该实例
+        pub trait Iterator {
+            type Item;
+            fn next(&mut self) -> Option<Self::Item>;
+        }
+        //     使用特征类型和使用泛型的不同
+        // 调用是使用Address比完整地写完AsRef<[u8]> + Clone + fmt::Debug + Eq + Hash要简单和可读性更强
+        pub trait CacheableItem: Clone + Default + fmt::Debug {
+            type Address: AsRef<[u8]> + Clone + fmt::Debug + Eq + Hash;
+            fn is_null(&self) -> bool;
+        }
+        // 使用泛型
+        trait Container<A, B> {
+            fn container(&self, a: A, b: B) -> bool;
+        }
+        fn difference<A, B, C>(container: &C) -> i32
+            where
+                C: Container<A, B> { return 128i32; }
+        // 可以看到使用了关联类型，可读性好不少
+        trait ContainerII {
+            type A;
+            type B;
+            fn contains(&self, a: &Self::A, b: &Self::B) -> bool;
+        }
+        fn difference_ii<C: ContainerII>(container: &C) {}
+    }
+    {
+        //     默认泛型类型参数
+        // 它有一个泛型参数 RHS
+        // 这里它给 RHS 一个默认值，也就是当用户不指定 RHS 时，默认使用两个同样类型的值进行相加，然后返回一个关联类型 Output
+        // trait Add<RHS = Self> {
+        //     type Output;
+        //     fn add(self, rhs: RHS) -> Self::Output;
+        // }
+        #[derive(Debug, PartialEq)]
+        struct Point {
+            x: i32,
+            y: i32,
+        }
+        impl Add for Point {
+            type Output = Point;
+            fn add(self, rhs: Point) -> Self::Output {
+                Point {
+                    x: self.x + rhs.x,
+                    y: self.y + rhs.y,
+                }
+            }
+        }
+        assert_eq!(Point { x: 0, y: 0 } + Point { x: 0, y: 0 }, Point { x: 0, y: 0 }, "true");
+        struct Millimeters(u32);
+        struct Meters(u32);
+        // 这里，是进行 Millimeters + Meters 两种数据类型的 + 操作，因此此时不能再使用默认的 RHS，否则就会变成 Millimeters + Millimeters 的形式。
+        // 使用 Add<Meters> 可以将 RHS 指定为 Meters，那么 fn add(self, rhs: RHS) 自然而言的变成了 Millimeters 和 Meters 的相加。
+        // 默认类型参数主要用于两个方面：
+        // 减少实现的样板代码
+        // 扩展类型但是无需大幅修改现有的代码
+        impl Add<Meters> for Millimeters {
+            type Output = Millimeters;
+            fn add(self, other: Meters) -> Self::Output {
+                Millimeters(self.0 + (other.0 * 1000))
+            }
+        }
+    }
+    {
+        trait Pilot {
+            fn fly(&self);
+        }
+        trait Wizard {
+            fn fly(&self);
+        }
+        struct Human;
+        impl Pilot for Human {
+            fn fly(&self) {
+                println!("This is your captain speaking")
+            }
+        }
+        impl Wizard for Human {
+            fn fly(&self) {
+                println!("This is Harry Porter")
+            }
+        }
+        impl Human {
+            fn fly(&self) {
+                println!("*waving arms")
+            }
+        }
+        let person = Human;
+        // 默认调用该类型中定义的方法
+        person.fly();
+        // 调用特征上的方法
+        Pilot::fly(&person);
+        Wizard::fly(&person);
+        // 调用关联函数
+        trait Animal {
+            fn baby_name() -> String;
+        }
+        struct Dog;
+        // 就像人类妈妈会给自己的宝宝起爱称一样，狗妈妈也会。狗妈妈称呼自己的宝宝为doggy，其它动物称呼狗宝宝为puppy，
+        // 这个时候假如有动物不知道该称如何呼狗宝宝，它需要查询一下。
+        impl Dog {
+            fn baby_name() -> String {
+                String::from("doggy")
+            }
+        }
+        impl Animal for Dog {
+            fn baby_name() -> String {
+                String::from("puppy")
+            }
+        }
+        println!("A baby dog is called a {}", Dog::baby_name());
+        // note: cannot satisfy `_: Animal`
+        // println!("A baby dog is called a {}", Animal::baby_name());
+        //  需要使用完全限定语法
+        // 在尖括号中，通过 as 关键字向 Rust 编译器提供了类型注解，也就是 Animal 就是 Dog，而不是其他动物，因此最终会调用 impl Animal for Dog 中的方法
+        // 完全限定语法可以用于任何函数或方法调用
+        println!("A baby dog is called a {}", <Dog as Animal>::baby_name());
     }
 }
 
@@ -224,6 +353,7 @@ struct CarShop {
 struct DefaultShop {
     name: String,
 }
+
 // 特征。和golang中的interface很像
 // 实现特征的语法与为结构体、枚举实现方法很像
 // 关于特征实现与定义的位置，有一条非常重要的原则：如果你想要为类型 A 实现特征 T，那么 A 或者 T 至少有一个是在当前作用域中定义的！
